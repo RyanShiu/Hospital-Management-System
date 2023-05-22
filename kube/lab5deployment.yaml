@@ -1,0 +1,265 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: scheduleworkdb-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: scheduleworkdb
+spec:
+  selector:
+    app: scheduleworkdb
+  ports:
+    - port: 3306
+      targetPort: 3306
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scheduleworkdb
+spec:
+  selector:
+    matchLabels:
+      app: scheduleworkdb
+  template:
+    metadata:
+      labels:
+        app: scheduleworkdb
+    spec:
+      containers:
+        - name: scheduleworkdb
+          image: rshiu/coe692:scheduleworkdb
+          ports:
+            - containerPort: 3306
+          volumeMounts:
+            - name: storage
+              mountPath: /data/scheduleworkdb
+      volumes:
+        - name: storage
+          persistentVolumeClaim:
+            claimName: scheduleworkdb-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: schedulework
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: schedulework
+  template:
+    metadata:
+      labels:
+        app: schedulework
+    spec:
+      containers:
+        - name: schedulework
+          image: rshiu/coe692:scheduleworkWebApp
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DB_URL
+              value: scheduleworkdb:3306
+            - name: kubeMQAddress
+              value: 10.24.14.133:50000
+          imagePullPolicy: Always
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: patientdb-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: patientdb
+spec:
+  selector:
+    app: patientdb
+  ports:
+    - port: 3306
+      targetPort: 3306
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: patientdb
+spec:
+  selector:
+    matchLabels:
+      app: patientdb
+  template:
+    metadata:
+      labels:
+        app: patientdb
+    spec:
+      containers:
+        - name: patientdb
+          image: rshiu/coe692:patientdb
+          ports:
+            - containerPort: 3306
+          volumeMounts:
+            - name: storage
+              mountPath: /data/patientdb
+      volumes:
+        - name: storage
+          persistentVolumeClaim:
+            claimName: patientdb-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: patient
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: patient
+  template:
+    metadata:
+      labels:
+        app: patient
+    spec:
+      containers:
+        - name: patient
+          image: rshiu/coe692:deletepatientWebApp
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DB_URL
+              value: patientdb:3306
+            - name: kubeMQAddress
+              value: 10.24.14.133:50000
+          imagePullPolicy: Always
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: managerdb-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: managerdb
+spec:
+  selector:
+    app: managerdb
+  ports:
+    - port: 3306
+      targetPort: 3306
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: managerdb
+spec:
+  selector:
+    matchLabels:
+      app: managerdb
+  template:
+    metadata:
+      labels:
+        app: managerdb
+    spec:
+      containers:
+        - name: managerdb
+          image: rshiu/coe692:managerdb
+          ports:
+            - containerPort: 3306
+          volumeMounts:
+            - name: storage
+              mountPath: /data/managerdb
+      volumes:
+        - name: storage
+          persistentVolumeClaim:
+            claimName: managerdb-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: rshiu/coe692:frontendWebApp
+          ports:
+            - containerPort: 8080
+          env:
+            - name: scheduleService
+              value: schedulework:80
+
+            - name: patientService
+              value: patient:80
+
+            - name: DB_URL
+              value: managerdb:3306
+
+            - name: kubeMQAddress
+              value: 10.24.14.133:50000
+          imagePullPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: schedulework
+spec:
+  selector:
+    app: schedulework
+  ports:
+    - port: 80
+      targetPort: 8080
+  type: LoadBalancer
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: patient
+spec:
+  selector:
+    app: patient
+  ports:
+    - port: 80
+      targetPort: 8080
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 8080
+  type: LoadBalancer
